@@ -73,8 +73,8 @@ def encode_data(data_loader, model_v, model_t):
             embs_v = model_v.encoder(v)
     
         ids.extend(i)
-        embeddings_t.extend(embs_t.numpy())
-        embeddings_v.extend(embs_v.numpy())
+        embeddings_t.extend(embs_t.cpu().numpy())
+        embeddings_v.extend(embs_v.cpu().numpy())
     
     embeddings_v = torch.from_numpy(np.array(embeddings_v)).squeeze()
     embeddings_t = torch.from_numpy(np.array(embeddings_t)).squeeze()

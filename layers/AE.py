@@ -40,11 +40,13 @@ class AE(nn.Module):
         )
          
     def encoder(self, x):
+        x = torch.tensor(x).float().cuda()
         x = self.encoder_(x)
         # add L2 normalization to get L2_norm(embedding) = 1
         return x
     
     def decoder(self, x):
+        x = torch.tensor(x).float().cuda()
         x = self.decoder_(x)
         return x
     

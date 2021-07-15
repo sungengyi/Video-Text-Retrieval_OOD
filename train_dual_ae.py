@@ -31,6 +31,8 @@ logging.basicConfig (
 logging.getLogger ().addHandler (logging.StreamHandler())
 logger = logging.getLogger()
     
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print("=====================================",device,"====================================")
 ################################################
 
 def optimize_vtr_model(lr, lr_step_size, weight_decay, batch_size_exp, activated_losses, relevance_score):
@@ -151,8 +153,8 @@ def forward_multimodal(model_v, model_t, criterion, v, t, coefs=None, active_los
     joint_active,reconst_v_active,reconst_t_active,cross_v_active,cross_t_active,cycle_v_active,cycle_t_active = active_losses
     
     # model_v and model_t are the corresponding models for video and captions respectively
-    v = torch.tensor(v).float()
-    t = torch.tensor(t).float()
+    v = torch.tensor(v).float().cuda()
+    t = torch.tensor(t).float().cuda()
 
     dims_v = v.shape
     dims_t = t.shape
@@ -261,8 +263,7 @@ def get_data_loader(split_path, v_feats_dir, t_feats_path, relevance_score, dl_p
 
 def train_model(data_loader_train, data_loader_valid, lr, lr_step_size, weight_decay, lr_gamma, n_epochs, n_feats_t, n_feats_v, T, L, dl_params, coefs, active_losses):   
              
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    
+
     num_samples = data_loader_train.__len__()
     
     ### create AE model for video and text encoding
@@ -321,8 +322,11 @@ def train_model(data_loader_train, data_loader_valid, lr, lr_step_size, weight_d
             v = sample['video']
             t = sample['sent']
 
+            v = torch.tensor(v).float().cuda()
+            t = torch.tensor(t).float().cuda()
+
             if flag == True:
-                writer.add_graph(model_v, torch.Tensor(v))
+                writer.add_graph(model_v, v)
                 flag = False
             
             loss = forward_multimodal(model_v, model_t, criterion, v, t, coefs, active_losses, target = target_tensor)
@@ -396,8 +400,8 @@ if __name__ == '__main__':
     
     parser.add_argument('--activate_joint', action='store_true', help = 'enables training using joint loss')
     
-    parser.add_argument('--activated_losses_binary_min', type=int, help = 'its binary indicates which losses to activate')
-    parser.add_argument('--activated_losses_binary_max', type=int, help = 'its binary indicates which losses to activate')
+    parser.add_argument('--activated_losses_binary_min', type=int, default = 127,  help = 'its binary indicates which losses to activate')
+    parser.add_argument('--activated_losses_binary_max', type=int, default = 127, help = 'its binary indicates which losses to activate')
     
     # loss criterion
     parser.add_argument('--loss_criterion', default = 'mse') # MSELoss
@@ -439,10 +443,10 @@ if __name__ == '__main__':
     parser.add_argument('--text_feats_path', default = 'feats/text/universal/sentence_feats.pkl')
     parser.add_argument('--train_split_path', default = 'train.split.pkl')    
     parser.add_argument('--valid_split_path', default = 'valid.split.pkl')
-    parser.add_argument('--output_path', default = '/usr/local/extstore01/zahra/Video-Text-Retrieval_OOD/output')
+    parser.add_argument('--output_path', default = '/usr/local/extstore01/gengyi/Video-Text-Retrieval_OOD/output')
 
-    parser.add_argument('--relevance_score_min', type = float, default = 0.05, help = 'relevance score in range (0.0, 1.0)')
-    parser.add_argument('--relevance_score_max', type = float, default = 0.7, help = 'relevance score in range (0.0, 1.0)')
+    parser.add_argument('--relevance_score_min', type = float, default = 0.01, help = 'relevance score in range (0.0, 1.0)')
+    parser.add_argument('--relevance_score_max', type = float, default = 0.01, help = 'relevance score in range (0.0, 1.0)')
     
     args = parser.parse_args()
     

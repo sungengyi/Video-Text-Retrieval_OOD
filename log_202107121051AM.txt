@@ -1,0 +1,42 @@
+===================================== cuda ====================================
+|   iter    |  target   | activa... | batch_... |    lr     | lr_ste... | releva... | weight... |
+-------------------------------------------------------------------------------------------------
+| [0m 1       [0m | [0m 0.27    [0m | [0m 127.0   [0m | [0m 7.803   [0m | [0m 0.002687[0m | [0m 6.388   [0m | [0m 0.01    [0m | [0m 0.008442[0m |
+| [0m 2       [0m | [0m 0.27    [0m | [0m 127.0   [0m | [0m 7.465   [0m | [0m 0.003995[0m | [0m 7.373   [0m | [0m 0.01    [0m | [0m 0.000310[0m |
+Mode Collapse! :(
+Moving on to the next round of Bayesian Optimization!
+| [0m 3       [0m | [0m-10.0    [0m | [0m 127.0   [0m | [0m 4.849   [0m | [0m 0.008184[0m | [0m 2.651   [0m | [0m 0.01    [0m | [0m 0.004758[0m |
+| [0m 4       [0m | [0m 0.27    [0m | [0m 127.0   [0m | [0m 5.165   [0m | [0m 0.003888[0m | [0m 2.255   [0m | [0m 0.01    [0m | [0m 0.00634 [0m |
+| [0m 5       [0m | [0m 0.27    [0m | [0m 127.0   [0m | [0m 7.141   [0m | [0m 0.008005[0m | [0m 5.628   [0m | [0m 0.01    [0m | [0m 0.009536[0m |
+| [0m 6       [0m | [0m 0.27    [0m | [0m 127.0   [0m | [0m 4.682   [0m | [0m 0.00935 [0m | [0m 9.54    [0m | [0m 0.01    [0m | [0m 0.001924[0m |
+Mode Collapse! :(
+Moving on to the next round of Bayesian Optimization!
+| [0m 7       [0m | [0m-10.0    [0m | [0m 127.0   [0m | [0m 4.391   [0m | [0m 0.003165[0m | [0m 4.961   [0m | [0m 0.01    [0m | [0m 0.005053[0m |
+| [0m 8       [0m | [0m 0.27    [0m | [0m 127.0   [0m | [0m 7.637   [0m | [0m 0.007415[0m | [0m 6.963   [0m | [0m 0.01    [0m | [0m 0.004805[0m |
+Mode Collapse! :(
+Moving on to the next round of Bayesian Optimization!
+| [0m 9       [0m | [0m-10.0    [0m | [0m 127.0   [0m | [0m 4.739   [0m | [0m 0.000313[0m | [0m 7.976   [0m | [0m 0.01    [0m | [0m 0.001061[0m |
+| [0m 10      [0m | [0m 0.27    [0m | [0m 127.0   [0m | [0m 7.687   [0m | [0m 0.009116[0m | [0m 2.764   [0m | [0m 0.01    [0m | [0m 0.00675 [0m |
+Traceback (most recent call last):
+  File "/usr/local/extstore01/gengyi/anaconda3/lib/python3.8/site-packages/bayes_opt/bayesian_optimization.py", line 179, in maximize
+    x_probe = next(self._queue)
+  File "/usr/local/extstore01/gengyi/anaconda3/lib/python3.8/site-packages/bayes_opt/bayesian_optimization.py", line 25, in __next__
+    raise StopIteration("Queue is empty, no more objects to retrieve.")
+StopIteration: Queue is empty, no more objects to retrieve.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "train_dual_ae.py", line 527, in <module>
+    optimizer.maximize(
+  File "/usr/local/extstore01/gengyi/anaconda3/lib/python3.8/site-packages/bayes_opt/bayesian_optimization.py", line 182, in maximize
+    x_probe = self.suggest(util)
+  File "/usr/local/extstore01/gengyi/anaconda3/lib/python3.8/site-packages/bayes_opt/bayesian_optimization.py", line 131, in suggest
+    suggestion = acq_max(
+  File "/usr/local/extstore01/gengyi/anaconda3/lib/python3.8/site-packages/bayes_opt/util.py", line 55, in acq_max
+    res = minimize(lambda x: -ac(x.reshape(1, -1), gp=gp, y_max=y_max),
+  File "/usr/local/extstore01/gengyi/anaconda3/lib/python3.8/site-packages/scipy/optimize/_minimize.py", line 617, in minimize
+    return _minimize_lbfgsb(fun, x0, args, jac, bounds,
+  File "/usr/local/extstore01/gengyi/anaconda3/lib/python3.8/site-packages/scipy/optimize/lbfgsb.py", line 294, in _minimize_lbfgsb
+    raise ValueError("LBFGSB - one of the lower bounds is greater than an upper bound.")
+ValueError: LBFGSB - one of the lower bounds is greater than an upper bound.
