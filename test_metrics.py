@@ -44,7 +44,7 @@ if __name__ == '__main__':
     v_feats_dir = f'{repo_dir}/{args.video_feats_dir}'
     t_feats_path = f'{repo_dir}/{args.text_feats_path}'
     
-    model_path = f'output/experiments/{args.model_name}/model_v_{args.model_name}.sd'
+    model_path = f'/usr/local/extstore01/zahra/Video-Text-Retrieval_OOD/output/experiments/{args.model_name}/model_v_{args.model_name}.sd'
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
