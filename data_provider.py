@@ -1,7 +1,7 @@
 import torch
 import pickle as pkl
 from torch.utils.data import Dataset
-import utilities as utils
+import utils.sys_utils as utils
 import numpy as np
 
 class TempuckeyVideoSentencePairsDataset(Dataset):
@@ -44,6 +44,8 @@ class TempuckeyVideoSentencePairsDataset(Dataset):
                
         if self.relevance_score > 0.0:
             self.split_ids = filter_dataset_by_relevance_score(self.split_ids, self.relevance_score)
+            
+        print(f'len dataset: {len(self.split_ids)}')
         
     def __len__(self):
         return len(self.split_ids)
@@ -74,7 +76,15 @@ class TempuckeyVideoSentencePairsDataset(Dataset):
 
         sample = {'id': idx_name ,'video': torch.tensor(sample['video']).float(), 'sent': torch.tensor(sample['sent']).float()}
         
-        return sample
+#         return sample
+        
+        v = sample['video']
+        t = sample['sent']
+
+#         v = torch.tensor(v).float()
+#         t = torch.tensor(t).float()
+        
+        return (v,t)
 
     def get_dataset_mean_std(self):
         '''
