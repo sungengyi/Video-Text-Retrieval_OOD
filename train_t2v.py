@@ -361,7 +361,7 @@ if __name__ == '__main__':
     parser.add_argument('--text_feats_path', default = 'feats/text/universal/sentence_feats.pkl')
     parser.add_argument('--train_split_path', default = 'train_valid.split.pkl')    
     parser.add_argument('--valid_split_path', default = 'valid.split.pkl')
-    parser.add_argument('--output_path', default = '/usr/local/extstore01/zahra/Video-Text-Retrieval_OOD/output')
+    parser.add_argument('--output_path', default = '/usr/local/extstore01/gengyi/Video-Text-Retrieval_OOD/output')
 
     parser.add_argument('--relevance_score_min', type = float, default = 0.05, help = 'relevance score in range (0.0, 1.0)')
     parser.add_argument('--relevance_score_max', type = float, default = 0.7, help = 'relevance score in range (0.0, 1.0)')
