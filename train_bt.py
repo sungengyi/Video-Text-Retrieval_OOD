@@ -113,7 +113,7 @@ def train_model(data_loader_train, data_loader_valid, lr, lr_step_size, weight_d
     # Stepwise LR
     # lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size = lr_step_size, gamma = lr_gamma)
     # CosineAnnealing LR
-    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, n_epochs*len(loader), eta_min=0, last_epoch=-1, verbose=False)
+    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, n_epochs*len(loader), eta_min=0, last_epoch=-1)
     
 
     avg_loss = []
@@ -148,7 +148,11 @@ def train_model(data_loader_train, data_loader_valid, lr, lr_step_size, weight_d
             if flag == True:
                 writer.add_graph(model, (y1,y2))
                 flag = False
-        
+        import math
+        if math.isnan(loss):
+            return None, None
+
+ 
         # write train loss to tensorboard
         avg_loss.append(total_loss/len(loader))
         writer.add_scalar(f'{exp_name}/loss/train', avg_loss[-1], epoch)
@@ -206,7 +210,7 @@ if __name__ == '__main__':
     parser.add_argument('--text_feats_path', default = 'feats/text/universal/sentence_feats.pkl')
     parser.add_argument('--train_split_path', default = 'train_valid.split.pkl')    
     parser.add_argument('--valid_split_path', default = 'valid.split.pkl')
-    parser.add_argument('--output_path', default = '/usr/local/extstore01/zahra/VTR_OOD/output')
+    parser.add_argument('--output_path', default = '/usr/local/extstore01/gengyi/VTR_OOD/output')
 
     parser.add_argument('--relevance_score_min', type = float, default = 0.05, help = 'relevance score in range (0.0, 1.0)')
     parser.add_argument('--relevance_score_max', type = float, default = 0.7, help = 'relevance score in range (0.0, 1.0)')
@@ -262,8 +266,10 @@ if __name__ == '__main__':
     bayes_n_iter = args.bayes_n_iter
        
     loss_criterion = args.loss_criterion
-    
-    # bounds of parameter space
+
+    optimize_model(lr_min, lr_step_size_min, weight_decay_min, batch_size_exp_min, relevance_score_min)
+    '''
+   # bounds of parameter space
     pbounds = {'lr': (lr_min, lr_max), 
                'lr_step_size': (lr_step_size_min, lr_step_size_max), 
                'weight_decay':(weight_decay_min, weight_decay_max), 
@@ -281,4 +287,4 @@ if __name__ == '__main__':
         init_points=bayes_init_points,
         n_iter=bayes_n_iter,
     )
-
+    '''

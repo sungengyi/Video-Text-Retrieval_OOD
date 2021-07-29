@@ -22,7 +22,7 @@ if __name__ == '__main__':
     parser.add_argument('--video_feats_dir', default = 'feats/video/r2plus1d_resnet50_kinetics400')
     parser.add_argument('--text_feats_path', default = 'feats/text/universal/sentence_feats.pkl')
     parser.add_argument('--test_split_path', default = 'test.split.pkl')
-    parser.add_argument('--output_path', default = '/usr/local/extstore01/zahra/Video-Text-Retrieval_OOD/output')
+    parser.add_argument('--output_path', default = '/usr/local/extstore01/gengyi/Video-Text-Retrieval_OOD/output')
     parser.add_argument('--model_name', default = 'experiment_shuffle_yes_loss_mse_lr_0.000956_lr_step_306_gamma_0.9_wdecay_0.000164_bsz_128_epochs_500_relevance_0.3_1x512_1x2048_f9f7b433923b4d97b0c6e75062bf6931')
     
     args = parser.parse_args()
