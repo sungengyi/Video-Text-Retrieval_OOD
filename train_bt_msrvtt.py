@@ -11,9 +11,9 @@ from datetime import datetime as dt
 import utils.sys_utils as utils
 import time
 from models.BT import BarlowTwins as BT
-from data_provider import TempuckeyVideoSentencePairsDataset as TempuckeyDataset
+from msrvtt_dataset import MSRVTTDataset as MSRVTT
 from data_provider import Normalize_VideoSentencePair
-from utils.train_utils import get_experiment_info, log_experiment_info, save_experiment, get_dataloader
+from utils.train_utils import get_experiment_info, log_experiment_info_msrvtt, save_experiment, get_dataloader
 from utils.sys_utils import create_dir_if_not_exist
 
 # init tensorboard
@@ -33,7 +33,7 @@ logging.getLogger ().addHandler (logging.StreamHandler())
 logger = logging.getLogger()
     
 
-def optimize_model(lr, lr_step_size, weight_decay, batch_size_exp, relevance_score):
+def optimize_model(lr, lr_step_size, weight_decay, batch_size_exp):
   
     global batch_size
     # use batch_size provided by bayes_opt as 2**int(value)
@@ -50,21 +50,21 @@ def optimize_model(lr, lr_step_size, weight_decay, batch_size_exp, relevance_sco
     logger.info(exp_info)
     
     # get data loaders for train and valid sets
-    dataloader_train = get_dataloader(train_split_path, v_feats_dir, t_feats_path, relevance_score, dl_params)
-    dataloader_valid = get_dataloader(valid_split_path, v_feats_dir, t_feats_path, relevance_score, dl_params)
+    dataset_trainval = MSRVTT(vid_feats_dir=v_feats_dir, txt_feats_path=t_feats_path, ids_path=trainval_split_path, transform=None)
+    dataloader_trainval = torch.utils.data.DataLoader(dataset_trainval, **dl_params)
 
     # get experiment name 
-    _, exp_name = log_experiment_info(output_path, lr, lr_step_size, weight_decay, lr_gamma, n_epochs, n_feats_t, n_feats_v, T, L, batch_size, relevance_score, shuffle, loss_criterion, write_it=False)
+    _, exp_name = log_experiment_info_msrvtt(output_path, lr, lr_step_size, weight_decay, lr_gamma, n_epochs, n_feats_t, n_feats_v, T, L, batch_size, shuffle, loss_criterion, write_it=False)
     
     # train 
     torch.set_grad_enabled(True)
-    model, train_loss = train_model(dataloader_train, dataloader_valid, lr, lr_step_size, weight_decay, lr_gamma, n_epochs, n_feats_t, n_feats_v, T, L, dl_params, exp_name)
+    model, train_loss = train_model(dataloader_trainval, None, lr, lr_step_size, weight_decay, lr_gamma, n_epochs, n_feats_t, n_feats_v, T, L, dl_params, exp_name)
       
     # calculate loss on validation
-    valid_loss = evaluate_validation(dataloader_valid, model)
+    # valid_loss = evaluate_validation(dataloader_valid, model)
        
     # log experiment meta data 
-    exp_dir, exp_name = log_experiment_info(output_path, lr, lr_step_size, weight_decay, lr_gamma, n_epochs, n_feats_t, n_feats_v, T, L, batch_size, relevance_score, shuffle, loss_criterion = None, write_it=True)
+    exp_dir, exp_name = log_experiment_info_msrvtt(output_path, lr, lr_step_size, weight_decay, lr_gamma, n_epochs, n_feats_t, n_feats_v, T, L, batch_size, shuffle, loss_criterion = None, write_it=True)
     
     # save trained model, training losses, and validation losses
     save_experiment(model, None, train_loss, exp_dir, exp_name)
@@ -75,7 +75,7 @@ def optimize_model(lr, lr_step_size, weight_decay, batch_size_exp, relevance_sco
     output_path_ = f'{output_path}/experiments/{exp_name}'
     create_dir_if_not_exist(output_path_)
     model.save(output_path_)
-    return valid_loss
+    return train_loss
 
 
 def evaluate_validation(dataloader, model):
@@ -113,7 +113,7 @@ def train_model(data_loader_train, data_loader_valid, lr, lr_step_size, weight_d
     # Stepwise LR
     # lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size = lr_step_size, gamma = lr_gamma)
     # CosineAnnealing LR
-    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, n_epochs*len(loader), eta_min=0, last_epoch=-1, verbose=False)
+    lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, n_epochs*len(loader), eta_min=0, last_epoch=-1)
     
 
     avg_loss = []
@@ -136,8 +136,8 @@ def train_model(data_loader_train, data_loader_valid, lr, lr_step_size, weight_d
                              step=step,
                              loss=loss.item(),
                              time=int(time.time() - start_time))
-                # logger.debug('Epoch[{}/{}], Step[{}/{}] Loss: {}\n'.format(epoch + 1,n_epochs,step,num_samples,loss.item()))
-                # logger.info(f'epoch[{epoch + 1}/{n_epochs}]\n\t loss train: {loss.item()}')
+                #logger.debug('Epoch[{}/{}], Step[{}/{}] Loss: {}\n'.format(epoch + 1,n_epochs,step,num_samples,loss.item()))
+                #logger.info(f'epoch[{epoch + 1}/{n_epochs}]\n\t loss train: {loss.item()}')
 
             lr_value = lr_scheduler.optimizer.param_groups[0]['lr']
             writer.add_scalar(f'{exp_name}/train/lr', lr_value, epoch)
@@ -152,6 +152,7 @@ def train_model(data_loader_train, data_loader_valid, lr, lr_step_size, weight_d
         # write train loss to tensorboard
         avg_loss.append(total_loss/len(loader))
         writer.add_scalar(f'{exp_name}/loss/train', avg_loss[-1], epoch)
+        logger.info(f'epoch[{epoch + 1}/{n_epochs}]\n\t loss train: {avg_loss[-1]}')
         
     avg_loss = np.array(avg_loss)
     
@@ -201,15 +202,11 @@ if __name__ == '__main__':
     parser.add_argument('--bayes_init_points', type = int, default = 1, help = 'bayesian optimization init points')
     
     # io params
-    parser.add_argument('--repo_dir', default = '/usr/local/data02/zahra/datasets/Tempuckey/sentence_segments')
-    parser.add_argument('--video_feats_dir', default = 'feats/video/r2plus1d_resnet50_kinetics400')
-    parser.add_argument('--text_feats_path', default = 'feats/text/universal/sentence_feats.pkl')
-    parser.add_argument('--train_split_path', default = 'train_valid.split.pkl')    
-    parser.add_argument('--valid_split_path', default = 'valid.split.pkl')
-    parser.add_argument('--output_path', default = '/usr/local/extstore01/zahra/VTR_OOD/output')
-
-    parser.add_argument('--relevance_score_min', type = float, default = 0.05, help = 'relevance score in range (0.0, 1.0)')
-    parser.add_argument('--relevance_score_max', type = float, default = 0.7, help = 'relevance score in range (0.0, 1.0)')
+    parser.add_argument('--repo_dir', default = '/usr/local/extstore01/zahra/datasets/MSRVTT')
+    parser.add_argument('--video_feats_dir', default = 'feats/video/r2plus1d_TrainVal')
+    parser.add_argument('--text_feats_path', default = 'feats/text/msrvtt_captions_np.pkl')
+    parser.add_argument('--trainval_split_path', default = 'TrainVal_videoid_sentid.txt')    
+    parser.add_argument('--output_path', default = '/usr/local/extstore01/zahra/VTR_OOD/output_msrvtt')
     
     parser.add_argument('--projector', default='1024-1024-1024', type=str, metavar='MLP', help='projector MLP')
     
@@ -222,9 +219,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     logger.info(args)
-
-    relevance_score_min = args.relevance_score_min
-    relevance_score_max = args.relevance_score_max
     
     lr_min = args.lr_min
     lr_max = args.lr_max
@@ -251,8 +245,7 @@ if __name__ == '__main__':
     L = args.t_feat_len
         
     repo_dir = args.repo_dir
-    train_split_path = f'{repo_dir}/{args.train_split_path}'
-    valid_split_path = f'{repo_dir}/{args.valid_split_path}'
+    trainval_split_path = f'{repo_dir}/{args.trainval_split_path}'
     output_path = args.output_path
     v_feats_dir = f'{repo_dir}/{args.video_feats_dir}'
     t_feats_path = f'{repo_dir}/{args.text_feats_path}'
@@ -267,8 +260,7 @@ if __name__ == '__main__':
     pbounds = {'lr': (lr_min, lr_max), 
                'lr_step_size': (lr_step_size_min, lr_step_size_max), 
                'weight_decay':(weight_decay_min, weight_decay_max), 
-               'batch_size_exp': (batch_size_exp_min, batch_size_exp_max), 
-               'relevance_score': (relevance_score_min,relevance_score_max)
+               'batch_size_exp': (batch_size_exp_min, batch_size_exp_max)
               }
 
     optimizer = BayesianOptimization(
