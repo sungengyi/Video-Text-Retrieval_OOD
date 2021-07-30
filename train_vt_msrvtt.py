@@ -11,11 +11,10 @@ from bayes_opt import BayesianOptimization
 from datetime import datetime as dt
 from torchvision import transforms
 
-# import utils.sys_utils as utils
-from models.BT import BarlowTwins as BT
+from models.VT import VT 
 from msrvtt_dataset import MSRVTTDataset as MSRVTT
 from msrvtt_dataset import Standardize_VideoSentencePair, ToTensor_VideoSentencePair
-from utils.train_utils import get_experiment_info, log_experiment_info_msrvtt, save_experiment, get_dataloader
+from utils.train_utils import get_experiment_info, log_experiment_info_msrvtt, save_experiment, get_dataloader_msrvtt
 from utils.sys_utils import create_dir_if_not_exist
 
 # init tensorboard
@@ -47,29 +46,41 @@ def optimize_model(lr, lr_step_size, weight_decay, batch_size_exp):
     
     lr_step_size = int(lr_step_size)
     
+    model_vt = VT(args)
+
+    if init_pretrained:
+        pretrained_ssl_experiment_name = 'experiment_shuffle_yes_loss_None_lr_0.000956_lr_step_306_gamma_0.9_wdecay_0.000603_bsz_128_epochs_1000_1x512_1x2048_f53a80d0575a473885e22942c4353eaf'
+
+        model_v_path = f'output_msrvtt/experiments/{pretrained_ssl_experiment_name}/model_v2t.sd'
+        model_t_path = f'output_msrvtt/experiments/{pretrained_ssl_experiment_name}/model_t2v.sd'
+        
+        model_v2r_file = open(model_v_path, 'rb')
+        model_t2r_file = open(model_t_path, 'rb')
+
+        model_v2r_sd = torch.load(model_v2r_file)
+        model_t2r_sd = torch.load(model_t2r_file)
+
+        model_vt.v2r.load_state_dict(model_v2r_sd)
+        model_vt.t2r.load_state_dict(model_t2r_sd)
+    
     # display experiment info
     exp_info = get_experiment_info(lr, lr_step_size, weight_decay, lr_gamma, n_epochs, n_feats_t, n_feats_v, T, L, batch_size)
     logger.info(exp_info)
     
     # get data loaders for train and valid sets
-    dataset_trainval = MSRVTT(vid_feats_dir=v_feats_dir, txt_feats_path=t_feats_path, ids_path=trainval_split_path, transform=None)
-    dataset_stats = dataset_trainval.get_dataset_mean_std()
-    standardize = Standardize_VideoSentencePair(dataset_stats)
-    trnsfrm = transforms.Compose([standardize, ToTensor_VideoSentencePair()])
-    dataset_trainval = MSRVTT(vid_feats_dir=v_feats_dir, txt_feats_path=t_feats_path, ids_path=trainval_split_path, transform=trnsfrm)
-
-    dataloader_trainval = torch.utils.data.DataLoader(dataset_trainval, **dl_params)
-
+    dataloader_trainval = get_dataloader_msrvtt(trainval_split_path, v_feats_dir_trainval, t_feats_path_trainval, dl_params)
+    #dataloader_test = get_dataloader_msrvtt(test_split_path, v_feats_dir_trainval, t_feats_path_test, dl_params)
+    
     # get experiment name 
     _, exp_name = log_experiment_info_msrvtt(output_path, lr, lr_step_size, weight_decay, lr_gamma, n_epochs, n_feats_t, n_feats_v, T, L, batch_size, shuffle, loss_criterion, write_it=False)
     
     # train 
     torch.set_grad_enabled(True)
     model, train_loss = train_model(dataloader_trainval, lr, lr_step_size, weight_decay, lr_gamma, n_epochs, n_feats_t, n_feats_v, T, L, dl_params, exp_name)
-      
+            
     # calculate loss on validation
-    # valid_loss = evaluate_validation(dataloader_valid, model)
-       
+    #valid_loss = evaluate_validation(dataloader_test, model)
+    
     # log experiment meta data 
     exp_dir, exp_name = log_experiment_info_msrvtt(output_path, lr, lr_step_size, weight_decay, lr_gamma, n_epochs, n_feats_t, n_feats_v, T, L, batch_size, shuffle, loss_criterion = None, write_it=True)
     
@@ -110,7 +121,7 @@ def train_model(data_loader_train, lr, lr_step_size, weight_decay, lr_gamma, n_e
     flag = True 
     
     ### instantiate model
-    model = BT(args)
+    model = VT(args)
     model.to(device)
     
     loader = data_loader_train
@@ -133,17 +144,10 @@ def train_model(data_loader_train, lr, lr_step_size, weight_decay, lr_gamma, n_e
             
             optimizer.zero_grad()
             loss = model.forward(y1, y2)
+
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
-                      
-#             if step % args.print_freq == 0:
-#                 stats = dict(epoch=epoch, 
-#                              step=step,
-#                              loss=loss.item(),
-#                              time=int(time.time() - start_time))
-#                 #logger.debug('Epoch[{}/{}], Step[{}/{}] Loss: {}\n'.format(epoch + 1,n_epochs,step,num_samples,loss.item()))
-#                 #logger.info(f'epoch[{epoch + 1}/{n_epochs}]\n\t loss train: {loss.item()}')
 
             lr_value = lr_scheduler.optimizer.param_groups[0]['lr']
             writer.add_scalar(f'{exp_name}/train/lr', lr_value, epoch)
@@ -151,9 +155,9 @@ def train_model(data_loader_train, lr, lr_step_size, weight_decay, lr_gamma, n_e
 
             total_loss+=loss.item()
 
-            if flag == True:
-                writer.add_graph(model, (y1,y2))
-                flag = False
+#             if flag == True:
+#                 writer.add_graph(model, (y1,y2))
+#                 flag = False
         
         # write train loss to tensorboard
         avg_loss.append(total_loss/len(loader))
@@ -165,10 +169,8 @@ def train_model(data_loader_train, lr, lr_step_size, weight_decay, lr_gamma, n_e
     writer.flush()
     return model, avg_loss.mean()
 
+# python -W ignore train_vt_msrvtt.py --n_epochs 10 --t_num_feats 512 --v_num_feats 2048 --batch_size_exp_min 7 --batch_size_exp_max 7 --lr_min 0.0001 --lr_max 0.001 --weight_decay_min 0.00001 --weight_decay_max 0.001 --lr_step_size_min 50 --lr_step_size_max 400 --lr_gamma 0.9 --shuffle --init-pretrained
 if __name__ == '__main__':
-    ### python -W ignore train_v2t.py --n_epochs 15 --t_num_feats 512 --v_num_feats 2048 
-    # python -W ignore train_bt.py --n_epochs 10 --t_num_feats 512 --v_num_feats 2048 --batch_size_exp_min 7 --batch_size_exp_max 7 --lr_min 0.0001 --lr_max 0.001 --weight_decay_min 0.00001 --weight_decay_max 0.001 --lr_step_size_min 50 --lr_step_size_max 400 --lr_gamma 0.9 --relevance_score_min 0.00001 --relevance_score_max 0.0001 --shuffle
-
     parser = argparse.ArgumentParser ()
     parser.add_argument('--n_epochs', type = int, default = 20, help = 'number of iterations')
     parser.add_argument('--n_train_samples', type = int, default = None, help = 'number of training samples')
@@ -209,9 +211,16 @@ if __name__ == '__main__':
     
     # io params
     parser.add_argument('--repo_dir', default = '/usr/local/extstore01/zahra/datasets/MSRVTT')
-    parser.add_argument('--video_feats_dir', default = 'feats/video/r2plus1d_TrainVal')
-    parser.add_argument('--text_feats_path', default = 'feats/text/msrvtt_captions_np.pkl')
+    
+    parser.add_argument('--video_feats_dir_trainval', default = 'feats/video/r2plus1d_TrainVal')
+    parser.add_argument('--text_feats_path_trainval', default = 'feats/text/msrvtt_captions_universal_trainval.pkl')
+    
+    parser.add_argument('--video_feats_dir_test', default = 'feats/video/r2plus1d_Test')
+    parser.add_argument('--text_feats_path_test', default = 'feats/text/msrvtt_captions_universal_test.pkl')
+    
     parser.add_argument('--trainval_split_path', default = 'TrainVal_videoid_sentid.txt')    
+    parser.add_argument('--test_split_path', default = 'Test_videoid_sentid.txt')    
+
     parser.add_argument('--output_path', default = '/usr/local/extstore01/zahra/VTR_OOD/output_msrvtt')
     
     parser.add_argument('--projector', default='1024-1024-1024', type=str, metavar='MLP', help='projector MLP')
@@ -221,6 +230,9 @@ if __name__ == '__main__':
     parser.add_argument('--shuffle', dest='shuffle', action='store_true')
     
     parser.add_argument('--print-freq', default=1, type=int, metavar='N', help='print frequency')
+    
+    parser.add_argument('--init-pretrained', action='store_true')
+    
     
     args = parser.parse_args()
     
@@ -252,9 +264,15 @@ if __name__ == '__main__':
         
     repo_dir = args.repo_dir
     trainval_split_path = f'{repo_dir}/{args.trainval_split_path}'
+    test_split_path = f'{repo_dir}/{args.test_split_path}'
     output_path = args.output_path
-    v_feats_dir = f'{repo_dir}/{args.video_feats_dir}'
-    t_feats_path = f'{repo_dir}/{args.text_feats_path}'
+    v_feats_dir_trainval = f'{repo_dir}/{args.video_feats_dir_trainval}'
+    t_feats_path_trainval = f'{repo_dir}/{args.text_feats_path_trainval}'
+    
+    v_feats_dir_test = f'{repo_dir}/{args.video_feats_dir_test}'
+    t_feats_path_test = f'{repo_dir}/{args.text_feats_path_test}'
+    
+    init_pretrained = args.init_pretrained
     
     ## bayes opt
     bayes_init_points = args.bayes_init_points
