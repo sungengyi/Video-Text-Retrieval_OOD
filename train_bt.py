@@ -58,14 +58,14 @@ def optimize_model(lr, lr_step_size, weight_decay, batch_size_exp, relevance_sco
     
     # train 
     torch.set_grad_enabled(True)
-    model, train_loss = train_model(dataloader_train, dataloader_valid, lr, lr_step_size, weight_decay, lr_gamma, n_epochs, n_feats_t, n_feats_v, T, L, dl_params, exp_name)
+    model, train_loss = train_model(dataloader_train, dataloader_valid, lr, lr_step_size, weight_decay, lr_gamma, n_epochs, n_feats_t, n_feats_v, T, L, dl_params, exp_name, relevance_score)
       
     # calculate loss on validation
     valid_loss = evaluate_validation(dataloader_valid, model)
        
     # log experiment meta data 
     exp_dir, exp_name = log_experiment_info(output_path, lr, lr_step_size, weight_decay, lr_gamma, n_epochs, n_feats_t, n_feats_v, T, L, batch_size, relevance_score, shuffle, loss_criterion = None, write_it=True)
-    
+    '''
     # save trained model, training losses, and validation losses
     save_experiment(model, None, train_loss, exp_dir, exp_name)
     logger.warning(f'saved model and train/valid loss to {exp_dir}')
@@ -75,6 +75,7 @@ def optimize_model(lr, lr_step_size, weight_decay, batch_size_exp, relevance_sco
     output_path_ = f'{output_path}/experiments/{exp_name}'
     create_dir_if_not_exist(output_path_)
     model.save(output_path_)
+    '''
     return valid_loss
 
 
@@ -95,7 +96,7 @@ def evaluate_validation(dataloader, model):
     return total_loss/len(dataloader)
     
 
-def train_model(data_loader_train, data_loader_valid, lr, lr_step_size, weight_decay, lr_gamma, n_epochs, n_feats_t, n_feats_v, T, L, dl_params, exp_name):   
+def train_model(data_loader_train, data_loader_valid, lr, lr_step_size, weight_decay, lr_gamma, n_epochs, n_feats_t, n_feats_v, T, L, dl_params, exp_name, relevance_score):   
              
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
@@ -119,6 +120,14 @@ def train_model(data_loader_train, data_loader_valid, lr, lr_step_size, weight_d
     avg_loss = []
     
     start_time = time.time()
+    
+    import sys
+    best = sys.maxsize
+    stop_counter = 0
+    best_epoch = 0
+
+    exp_dir, exp_name = log_experiment_info(output_path, lr, lr_step_size, weight_decay, lr_gamma, n_epochs, n_feats_t, n_feats_v, T, L, dl_params['batch_size'], relevance_score, dl_params['shuffle'])
+
     for epoch in range(n_epochs):
         total_loss = 0
         for step, (y1, y2) in enumerate(loader, start=epoch * len(loader)):
@@ -157,10 +166,34 @@ def train_model(data_loader_train, data_loader_valid, lr, lr_step_size, weight_d
         avg_loss.append(total_loss/len(loader))
         writer.add_scalar(f'{exp_name}/loss/train', avg_loss[-1], epoch)
         
+        is_best = avg_loss[-1] < best
+        best = min(avg_loss[-1], best)
+        print("epoch[{}/{}]".format(epoch,n_epochs))
+        print("Current Perfomance:{}".format(avg_loss[-1]))
+        print("Best Perfomance:{}".format(best))
+        print('')
+        
+
+        if is_best:
+            save_experiment(model, None, best, exp_dir, exp_name)
+            logger.warning(f'saved BEST model and train/valid loss to {exp_dir}')
+            logger.warning(f'loss train:{best}')
+            output_path_ = f'{output_path}/experiments/{exp_name}'
+            create_dir_if_not_exist(output_path_)
+            model.save(output_path_)
+
+        if not is_best:
+            stop_counter+=1
+            if stop_counter > 10:
+                print("Early stopping")
+                break
+        else: 
+            stop_counter = 0
+
     avg_loss = np.array(avg_loss)
     
     writer.flush()
-    return model, avg_loss.mean()
+    return model, avg_loss[-1]#.mean()
 
 if __name__ == '__main__':
     ### python -W ignore train_v2t.py --n_epochs 15 --t_num_feats 512 --v_num_feats 2048 
@@ -267,8 +300,7 @@ if __name__ == '__main__':
        
     loss_criterion = args.loss_criterion
 
-    optimize_model(lr_min, lr_step_size_min, weight_decay_min, batch_size_exp_min, relevance_score_min)
-    '''
+    #optimize_model(lr_min, lr_step_size_min, weight_decay_min, batch_size_exp_min, relevance_score_min)
    # bounds of parameter space
     pbounds = {'lr': (lr_min, lr_max), 
                'lr_step_size': (lr_step_size_min, lr_step_size_max), 
@@ -287,4 +319,3 @@ if __name__ == '__main__':
         init_points=bayes_init_points,
         n_iter=bayes_n_iter,
     )
-    '''

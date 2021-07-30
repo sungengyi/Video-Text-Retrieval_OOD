@@ -119,8 +119,17 @@ def train_model(data_loader_train, data_loader_valid, lr, lr_step_size, weight_d
     avg_loss = []
     
     start_time = time.time()
+   
+    import sys
+    best = sys.maxsize
+    stop_counter = 0
+    best_epoch = 0
+    
+    exp_dir, exp_name = log_experiment_info_msrvtt(output_path, lr, lr_step_size, weight_decay, lr_gamma, n_epochs, n_feats_t, n_feats_v, T, L, batch_size, shuffle, loss_criterion = None, write_it=True)
+    
     for epoch in range(n_epochs):
         total_loss = 0
+        
         for step, (y1, y2) in enumerate(loader, start=epoch * len(loader)):
             y1 = y1.cuda()
             y2 = y2.cuda()
@@ -152,6 +161,34 @@ def train_model(data_loader_train, data_loader_valid, lr, lr_step_size, weight_d
         # write train loss to tensorboard
         avg_loss.append(total_loss/len(loader))
         writer.add_scalar(f'{exp_name}/loss/train', avg_loss[-1], epoch)
+        
+        is_best = avg_loss[-1] < best
+        best = min(avg_loss[-1], best)
+        print("Current Performance: {}".format(avg_loss[-1]))
+        print("Best Perfomance:{}".format(best))
+        print('')
+        
+        if is_best:
+            save_experiment(model, None, best, exp_dir, exp_name)
+
+            # save trained model, training losses, and validation losses
+            save_experiment(model, None, train_loss, exp_dir, exp_name)
+            logger.warning(f'saved model and train/valid loss to {exp_dir}')
+
+            logger.warning(f'loss train: {train_loss}')
+    
+            output_path_ = f'{output_path}/experiments/{exp_name}'
+            create_dir_if_not_exist(output_path_)
+            model.save(output_path_)
+        if not is_best:
+            stop_counter+=1
+            if stop_counter>10:
+                print("Early stopping")
+                break
+        else:
+            stop_counter = 0
+
+
         logger.info(f'epoch[{epoch + 1}/{n_epochs}]\n\t loss train: {avg_loss[-1]}')
         
     avg_loss = np.array(avg_loss)
@@ -206,7 +243,7 @@ if __name__ == '__main__':
     parser.add_argument('--video_feats_dir', default = 'feats/video/r2plus1d_TrainVal')
     parser.add_argument('--text_feats_path', default = 'feats/text/msrvtt_captions_np.pkl')
     parser.add_argument('--trainval_split_path', default = 'TrainVal_videoid_sentid.txt')    
-    parser.add_argument('--output_path', default = '/usr/local/extstore01/zahra/VTR_OOD/output_msrvtt')
+    parser.add_argument('--output_path', default = '/usr/local/extstore01/gengyi/VTR_OOD/output_msrvtt')
     
     parser.add_argument('--projector', default='1024-1024-1024', type=str, metavar='MLP', help='projector MLP')
     
