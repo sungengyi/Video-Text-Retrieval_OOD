@@ -178,10 +178,10 @@ def train_model(data_loader_train, lr, lr_step_size, weight_decay, lr_gamma, n_e
             save_experiment(model, None, best, exp_dir, exp_name)
 
             # save trained model, training losses, and validation losses
-            save_experiment(model, None, train_loss, exp_dir, exp_name)
+            save_experiment(model, None, best, exp_dir, exp_name)
             logger.warning(f'saved model and train/valid loss to {exp_dir}')
 
-            logger.warning(f'loss train: {train_loss}')
+            logger.warning(f'loss train: {best}')
     
             output_path_ = f'{output_path}/experiments/{exp_name}'
             create_dir_if_not_exist(output_path_)
@@ -247,7 +247,7 @@ if __name__ == '__main__':
     # io params
     parser.add_argument('--repo_dir', default = '/usr/local/extstore01/zahra/datasets/MSRVTT')
     parser.add_argument('--video_feats_dir', default = 'feats/video/r2plus1d_TrainVal')
-    parser.add_argument('--text_feats_path', default = 'feats/text/msrvtt_captions_np.pkl')
+    parser.add_argument('--text_feats_path', default = 'feats/text/msrvtt_captions_universal_trainval.pkl')
     parser.add_argument('--trainval_split_path', default = 'TrainVal_videoid_sentid.txt')    
     parser.add_argument('--output_path', default = '/usr/local/extstore01/gengyi/VTR_OOD/output_msrvtt')
     
